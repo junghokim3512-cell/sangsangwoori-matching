@@ -47,20 +47,28 @@ export default function RegisterPage() {
     if (Object.keys(errs).length > 0) return
 
     setLoading(true)
-    const { error } = await supabase.from('seniors').insert({
-      name: form.name.trim(),
-      region: form.region,
-      desired_job: form.desired_job,
-      career_years: form.career_years ? parseInt(form.career_years, 10) : null,
-    })
-    setLoading(false)
+    const { data: senior, error } = await supabase
+      .from('seniors')
+      .insert({
+        name: form.name.trim(),
+        region: form.region,
+        desired_job: form.desired_job,
+        career_years: form.career_years ? parseInt(form.career_years, 10) : null,
+      })
+      .select('id')
+      .single()
 
-    if (error) {
+    if (error || !senior) {
+      setLoading(false)
       setErrors({ name: '저장 중 오류가 발생했습니다. 다시 시도해 주세요.' })
-    } else {
-      setSuccess(true)
-      setForm({ name: '', region: '', desired_job: '', career_years: '' })
+      return
     }
+
+    // 시니어 등록 직후 매칭 점수 재계산
+    await supabase.rpc('recalc_matches_for_senior', { p_senior_id: senior.id })
+    setLoading(false)
+    setSuccess(true)
+    setForm({ name: '', region: '', desired_job: '', career_years: '' })
   }
 
   function field(key: keyof FormState, label: string, required: boolean, children: React.ReactNode) {
@@ -91,7 +99,10 @@ export default function RegisterPage() {
         {success && (
           <div className="mb-8 p-5 bg-green-50 border-2 border-green-500 rounded-xl">
             <p className="text-2xl font-bold text-green-700">등록이 완료되었습니다 ✓</p>
-            <p className="mt-1 text-lg text-green-600">프로필이 저장되었습니다. 추천 탭에서 결과를 확인해 보세요.</p>
+            <p className="mt-1 text-lg text-green-600">
+              매칭 점수가 자동으로 계산되었습니다.{' '}
+              <a href="/recommendations" className="underline font-semibold">추천 목록 보기</a>
+            </p>
           </div>
         )}
 
